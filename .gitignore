@@ -1,0 +1,26 @@
+# Environment
+.env
+backend/.venv/
+
+# Database
+data/*.db
+data/*.db-journal
+
+# Logs
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

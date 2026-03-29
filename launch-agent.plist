@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.user.network-schedule-manager</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <string>VENV_PATH/bin/uvicorn</string>
+    <string>main:app</string>
+    <string>--host</string>
+    <string>0.0.0.0</string>
+    <string>--port</string>
+    <string>PORT_VALUE</string>
+  </array>
+
+  <key>WorkingDirectory</key>
+  <string>PROJECT_PATH/backend</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>VENV_PATH/bin:/usr/local/bin:/usr/bin:/bin</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+
+  <key>KeepAlive</key>
+  <true/>
+
+  <key>StandardOutPath</key>
+  <string>PROJECT_PATH/logs/service.log</string>
+
+  <key>StandardErrorPath</key>
+  <string>PROJECT_PATH/logs/service.err</string>
+</dict>
+</plist>
