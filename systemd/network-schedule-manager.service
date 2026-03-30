@@ -1,0 +1,19 @@
+[Unit]
+Description=Network Schedule Manager
+After=network.target
+
+[Service]
+Type=simple
+User=INSTALL_USER
+WorkingDirectory=INSTALL_PATH/backend
+EnvironmentFile=INSTALL_PATH/.env
+Environment=PATH=INSTALL_PATH/backend/.venv/bin:/usr/local/bin:/usr/bin:/bin
+ExecStartPre=INSTALL_PATH/backend/.venv/bin/alembic upgrade head
+ExecStart=INSTALL_PATH/backend/.venv/bin/uvicorn main:app --host 0.0.0.0 --port PORT_VALUE
+Restart=always
+RestartSec=5
+StandardOutput=append:INSTALL_PATH/logs/service.log
+StandardError=append:INSTALL_PATH/logs/service.err
+
+[Install]
+WantedBy=multi-user.target

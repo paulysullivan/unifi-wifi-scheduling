@@ -1,11 +1,10 @@
 import logging
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from config import settings
 from database import async_session
@@ -21,13 +20,11 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
     async with async_session() as db:
         await seed_admin(db)
     await start_scheduler()
     logger.info(f"Network Schedule Manager running on port {settings.port}")
     yield
-    # Shutdown
     stop_scheduler()
 
 
@@ -41,6 +38,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.get("/api/health")
+async def health():
+    return JSONResponse({"status": "ok"})
+
+
 # Register API routers
 from routers import auth, credentials, devices, groups, schedules, extensions, status
 
@@ -53,8 +56,8 @@ app.include_router(extensions.router)
 app.include_router(status.router)
 
 # Serve frontend static files
-dist_dir = Path(__file__).parent / "../frontend/dist"
-if dist_dir.exists():
+dist_dir = settings.resolved_static_dir
+if dist_dir and dist_dir.exists():
     app.mount("/assets", StaticFiles(directory=str(dist_dir / "assets")), name="assets")
 
     @app.get("/{full_path:path}")
