@@ -22,7 +22,7 @@ Built to run persistently on a local network — as a Docker container, macOS la
 | Frontend | React 18, Vite 5, Tailwind CSS 3, TanStack Query v5 |
 | Database | SQLite (via aiosqlite + Alembic migrations) |
 | Auth | JWT (python-jose) + bcrypt password hashing |
-| UniFi API | httpx (async), per-device block/unblock via stamgr |
+| UniFi API | httpx (async), UniFi API key auth, per-device block/unblock via stamgr |
 | Encryption | Fernet symmetric encryption for stored UniFi credentials |
 
 ## Quick Start (Docker)
@@ -77,7 +77,7 @@ Log in with the `ADMIN_USERNAME` / `ADMIN_PASSWORD` from your `.env` file.
 ### 4. Connect to UniFi
 
 1. Go to **Settings**
-2. Add your UDM Pro credentials (URL, username, password, site ID)
+2. Add your UDM Pro credentials (URL, API key, site ID)
 3. Click **Test Connection**
 4. **Activate** the credential set
 5. Go to **Devices** and click **Sync from Network**
@@ -143,7 +143,7 @@ make db-rollback        # Roll back one migration (alembic downgrade -1)
 
 ## API Endpoints
 
-All endpoints except `/api/auth/login` and `/api/health` require `Authorization: Bearer <token>`.
+All endpoints except `POST /api/auth/login` and `GET /api/health` require `Authorization: Bearer <token>`.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -173,7 +173,7 @@ All endpoints except `/api/auth/login` and `/api/health` require `Authorization:
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
 | `SECRET_KEY` | Yes | — | JWT signing key |
-| `ENCRYPTION_KEY` | Yes | — | Fernet key for encrypting stored UniFi passwords |
+| `ENCRYPTION_KEY` | Yes | — | Fernet key for encrypting stored UniFi API keys |
 | `ADMIN_PASSWORD` | Yes | — | Initial admin password (used once on first run) |
 | `ADMIN_USERNAME` | No | `admin` | Initial admin username |
 | `DB_PATH` | No | `../data/network_schedule.db` | SQLite database path |
@@ -200,10 +200,10 @@ manage-network-schedule/
 │   ├── models.py               # ORM models (8 tables)
 │   ├── schemas.py              # Pydantic request/response schemas
 │   ├── auth.py                 # JWT + bcrypt
+│   ├── seed.py                 # First-run admin seeding
 │   ├── encryption.py           # Fernet encrypt/decrypt
 │   ├── unifi.py                # Async UniFi API client
 │   ├── scheduler.py            # APScheduler jobs + reconciliation
-│   ├── seed.py                 # First-run admin seeding
 │   ├── alembic/                # Database migrations
 │   └── routers/                # API route handlers
 ├── frontend/
@@ -221,6 +221,7 @@ manage-network-schedule/
 
 - UniFi controller passwords are encrypted at rest with Fernet before storage in SQLite
 - JWTs expire after 8 hours
+- UniFi API keys are encrypted at rest with Fernet before storage
 - SSL verification is disabled for UniFi API calls (UDM Pro uses self-signed certificates)
 - `.env` and `data/` are gitignored — never commit secrets or the database
 - The `.env` file is excluded from Docker images; secrets are injected at runtime via `env_file`

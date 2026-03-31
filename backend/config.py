@@ -11,9 +11,9 @@ class Settings(BaseSettings):
     db_path: str = "../data/network_schedule.db"
     port: int = 7323
     cors_origins: str = "http://localhost:5173,http://localhost:7323"
+    max_extension_minutes: int = 120
     admin_username: str = "admin"
     admin_password: str = ""
-    max_extension_minutes: int = 120
     static_dir: str = ""
 
     @property
@@ -46,6 +46,7 @@ class Settings(BaseSettings):
     model_config = {
         "env_file": str(_env_file) if _env_file.exists() else None,
         "env_file_encoding": "utf-8",
+        "extra": "ignore",
     }
 
 

@@ -38,7 +38,7 @@ async def list_extensions(
 async def add_extension(
     body: ExtensionCreate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    _user: User = Depends(get_current_user),
 ):
     schedule = await db.get(Schedule, body.schedule_id)
     if not schedule:
@@ -46,7 +46,6 @@ async def add_extension(
     if schedule.group_id != body.group_id:
         raise HTTPException(status_code=400, detail="Schedule does not belong to this group")
 
-    # Check existing extension for today
     result = await db.execute(
         select(Extension).where(
             and_(
@@ -69,7 +68,6 @@ async def add_extension(
         existing.extended_restrict_start = _add_minutes_to_time(
             existing.original_restrict_start, new_minutes
         )
-        existing.created_by = user.id
         await db.commit()
         await db.refresh(existing)
 
@@ -88,7 +86,7 @@ async def add_extension(
             added_minutes=15,
             original_restrict_start=schedule.restrict_start,
             extended_restrict_start=_add_minutes_to_time(schedule.restrict_start, 15),
-            created_by=user.id,
+            created_by=_user.id,
         )
         db.add(ext)
         await db.commit()

@@ -24,11 +24,11 @@ export default function App() {
           <ProtectedRoute>
             <Layout>
               <Routes>
-                <Route path="/" element={<Dashboard />} />
-                <Route path="/devices" element={<Devices />} />
-                <Route path="/groups" element={<Groups />} />
-                <Route path="/schedules" element={<Schedules />} />
-                <Route path="/settings" element={<Settings />} />
+                <Route index element={<Dashboard />} />
+                <Route path="devices" element={<Devices />} />
+                <Route path="groups" element={<Groups />} />
+                <Route path="schedules" element={<Schedules />} />
+                <Route path="settings" element={<Settings />} />
               </Routes>
             </Layout>
           </ProtectedRoute>

@@ -27,8 +27,7 @@ async def _get_unifi_client() -> UnifiClient | None:
             return None
         return UnifiClient(
             host=cred.host,
-            username=cred.username,
-            password=decrypt(cred.encrypted_password),
+            api_key=decrypt(cred.encrypted_api_key),
             site_id=cred.site_id,
             verify_ssl=cred.verify_ssl,
         )

@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from database import get_db
-from models import Device, UnifiCredential, User, GroupDevice
+from models import Device, UnifiCredential, GroupDevice
 from auth import get_current_user
 from encryption import decrypt
 from schemas import DeviceResponse, DeviceUpdate, SyncResponse
@@ -33,7 +33,7 @@ async def list_devices(
     group_id: int | None = Query(None),
     unassigned: bool = Query(False),
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     query = select(Device).options(selectinload(Device.groups))
 
@@ -51,7 +51,7 @@ async def list_devices(
 @router.post("/sync", response_model=SyncResponse)
 async def sync_devices(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     result = await db.execute(
         select(UnifiCredential).where(UnifiCredential.is_active == True)
@@ -62,8 +62,7 @@ async def sync_devices(
 
     client = UnifiClient(
         host=cred.host,
-        username=cred.username,
-        password=decrypt(cred.encrypted_password),
+        api_key=decrypt(cred.encrypted_api_key),
         site_id=cred.site_id,
         verify_ssl=cred.verify_ssl,
     )
@@ -114,7 +113,7 @@ async def update_device(
     mac: str,
     body: DeviceUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     result = await db.execute(
         select(Device).where(Device.mac == mac.lower()).options(selectinload(Device.groups))

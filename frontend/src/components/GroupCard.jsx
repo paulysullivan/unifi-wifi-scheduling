@@ -1,11 +1,11 @@
-import { useNavigate } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 
 export default function GroupCard({ group }) {
-  const navigate = useNavigate()
+  const [, setSearchParams] = useSearchParams()
 
   return (
     <div
-      onClick={() => navigate(`/groups?id=${group.id}`)}
+      onClick={() => setSearchParams({ id: group.id })}
       className="bg-white rounded-xl border border-gray-200 p-4 hover:shadow-md transition cursor-pointer"
     >
       <div className="flex items-center gap-3 mb-2">

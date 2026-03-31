@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models import UnifiCredential, User
+from models import UnifiCredential
 from auth import get_current_user
 from encryption import encrypt, decrypt
 from schemas import CredentialCreate, CredentialUpdate, CredentialResponse, TestConnectionResponse
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/credentials", tags=["credentials"])
 @router.get("", response_model=list[CredentialResponse])
 async def list_credentials(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     result = await db.execute(select(UnifiCredential))
     return result.scalars().all()
@@ -26,13 +26,12 @@ async def list_credentials(
 async def create_credential(
     body: CredentialCreate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     cred = UnifiCredential(
         label=body.label,
         host=body.host,
-        username=body.username,
-        encrypted_password=encrypt(body.password),
+        encrypted_api_key=encrypt(body.api_key),
         site_id=body.site_id,
         verify_ssl=body.verify_ssl,
     )
@@ -47,15 +46,15 @@ async def update_credential(
     cred_id: int,
     body: CredentialUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     cred = await db.get(UnifiCredential, cred_id)
     if not cred:
         raise HTTPException(status_code=404, detail="Credential not found")
     for field, value in body.model_dump(exclude_unset=True).items():
-        if field == "password" and value is not None:
-            cred.encrypted_password = encrypt(value)
-        elif field != "password":
+        if field == "api_key" and value is not None:
+            cred.encrypted_api_key = encrypt(value)
+        elif field != "api_key":
             setattr(cred, field, value)
     await db.commit()
     await db.refresh(cred)
@@ -66,7 +65,7 @@ async def update_credential(
 async def delete_credential(
     cred_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     cred = await db.get(UnifiCredential, cred_id)
     if not cred:
@@ -80,7 +79,7 @@ async def delete_credential(
 async def test_connection(
     cred_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     cred = await db.get(UnifiCredential, cred_id)
     if not cred:
@@ -88,8 +87,7 @@ async def test_connection(
 
     client = UnifiClient(
         host=cred.host,
-        username=cred.username,
-        password=decrypt(cred.encrypted_password),
+        api_key=decrypt(cred.encrypted_api_key),
         site_id=cred.site_id,
         verify_ssl=cred.verify_ssl,
     )
@@ -107,7 +105,7 @@ async def test_connection(
 async def activate_credential(
     cred_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     cred = await db.get(UnifiCredential, cred_id)
     if not cred:

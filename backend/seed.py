@@ -9,13 +9,9 @@ from auth import hash_password
 logger = logging.getLogger(__name__)
 
 
-async def seed_admin(db: AsyncSession) -> None:
-    result = await db.execute(select(User).limit(1))
-    if result.scalar_one_or_none() is not None:
-        return
-
-    if not settings.admin_password:
-        logger.warning("No ADMIN_PASSWORD set in .env — skipping admin seed")
+async def seed_admin(db: AsyncSession):
+    result = await db.execute(select(User))
+    if result.scalars().first() is not None:
         return
 
     admin = User(

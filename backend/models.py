@@ -21,8 +21,7 @@ class UnifiCredential(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     label: Mapped[str] = mapped_column(Text, nullable=True)
     host: Mapped[str] = mapped_column(Text, nullable=False)
-    username: Mapped[str] = mapped_column(Text, nullable=False)
-    encrypted_password: Mapped[str] = mapped_column(Text, nullable=False)
+    encrypted_api_key: Mapped[str] = mapped_column(Text, nullable=False)
     site_id: Mapped[str] = mapped_column(Text, default="default")
     verify_ssl: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -104,9 +103,7 @@ class Extension(Base):
     original_restrict_start: Mapped[str] = mapped_column(Text, nullable=False)
     extended_restrict_start: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
-    created_by: Mapped[int | None] = mapped_column(
-        Integer, ForeignKey("users.id"), nullable=True
-    )
+    created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
 
 class EnforcementLog(Base):

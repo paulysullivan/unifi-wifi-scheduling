@@ -1,11 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
 from models import User
-from auth import verify_password, create_access_token, hash_password, get_current_user
+from auth import verify_password, create_access_token, get_current_user
 from schemas import LoginRequest, TokenResponse, UserResponse, ChangePasswordRequest
+from auth import hash_password
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -15,17 +16,15 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.username == body.username))
     user = result.scalar_one_or_none()
     if not user or not verify_password(body.password, user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
-        )
-    token = create_access_token(data={"sub": user.username})
-    return TokenResponse(access_token=token)
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+
+    token = create_access_token({"sub": str(user.id)})
+    return TokenResponse(access_token=token, token_type="bearer")
 
 
 @router.get("/me", response_model=UserResponse)
-async def me(user: User = Depends(get_current_user)):
-    return user
+async def get_me(user: User = Depends(get_current_user)):
+    return UserResponse(id=user.id, username=user.username, created_at=user.created_at)
 
 
 @router.post("/change-password")

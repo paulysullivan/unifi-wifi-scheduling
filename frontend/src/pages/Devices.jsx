@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listDevices, syncDevices, updateDevice } from '../api/devices'
-import { listGroups, setGroupDevices } from '../api/groups'
+import { listGroups, getGroup, setGroupDevices, removeDeviceFromGroup } from '../api/groups'
 import DeviceTable from '../components/DeviceTable'
 
 export default function Devices() {
@@ -85,11 +85,18 @@ export default function Devices() {
           onSave={(name) => {
             updateMutation.mutate({ mac: selectedDevice.mac, data: { name } })
           }}
-          onGroupChange={(groupId, macs) => {
-            setGroupDevices(groupId, macs).then(() => {
-              queryClient.invalidateQueries({ queryKey: ['devices'] })
-              queryClient.invalidateQueries({ queryKey: ['groups'] })
-            })
+          onGroupChange={async (groupId, mac, add) => {
+            if (add) {
+              const group = await getGroup(groupId)
+              const currentMacs = group.devices?.map((d) => d.mac) || []
+              if (!currentMacs.includes(mac)) {
+                await setGroupDevices(groupId, [...currentMacs, mac])
+              }
+            } else {
+              await removeDeviceFromGroup(groupId, mac)
+            }
+            queryClient.invalidateQueries({ queryKey: ['devices'] })
+            queryClient.invalidateQueries({ queryKey: ['groups'] })
           }}
         />
       )}
@@ -99,6 +106,19 @@ export default function Devices() {
 
 function DeviceEditPanel({ device, groups, onClose, onSave, onGroupChange }) {
   const [name, setName] = useState(device.name || '')
+
+  const toggleGroup = (group) => {
+    const isInGroup = device.groups.includes(group.name)
+    // We need to get current group members and add/remove this device
+    // For simplicity, use the setGroupDevices endpoint per group
+    if (isInGroup) {
+      // Remove from group: we need the group's current macs minus this device
+      // We'll use the onGroupChange callback which calls setGroupDevices
+      onGroupChange(group.id, device.mac, false)
+    } else {
+      onGroupChange(group.id, device.mac, true)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50">
@@ -140,12 +160,36 @@ function DeviceEditPanel({ device, groups, onClose, onSave, onGroupChange }) {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
               Groups
             </label>
-            <p className="text-sm text-gray-500 mb-2">
-              {device.groups.length > 0 ? device.groups.join(', ') : 'Unassigned'}
-            </p>
+            {groups.length > 0 ? (
+              <div className="space-y-1.5">
+                {groups.map((g) => {
+                  const isInGroup = device.groups.includes(g.name)
+                  return (
+                    <label
+                      key={g.id}
+                      className="flex items-center gap-2.5 cursor-pointer hover:bg-gray-50 rounded-lg px-2 py-1.5 -mx-2"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isInGroup}
+                        onChange={() => toggleGroup(g)}
+                        className="rounded border-gray-300"
+                      />
+                      <div
+                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: g.color || '#4f46e5' }}
+                      />
+                      <span className="text-sm">{g.name}</span>
+                    </label>
+                  )
+                })}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-400">No groups created yet</p>
+            )}
           </div>
         </div>
       </div>

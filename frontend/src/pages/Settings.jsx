@@ -29,8 +29,7 @@ function UnifiSection() {
   const [form, setForm] = useState({
     label: '',
     host: 'https://192.168.1.1',
-    username: '',
-    password: '',
+    api_key: '',
     site_id: 'default',
     verify_ssl: false,
   })
@@ -71,8 +70,7 @@ function UnifiSection() {
     setForm({
       label: '',
       host: 'https://192.168.1.1',
-      username: '',
-      password: '',
+      api_key: '',
       site_id: 'default',
       verify_ssl: false,
     })
@@ -84,8 +82,7 @@ function UnifiSection() {
     setForm({
       label: cred.label || '',
       host: cred.host,
-      username: cred.username,
-      password: '',
+      api_key: '',
       site_id: cred.site_id,
       verify_ssl: cred.verify_ssl,
     })
@@ -96,7 +93,7 @@ function UnifiSection() {
   const handleSubmit = (e) => {
     e.preventDefault()
     const data = { ...form }
-    if (editId && !data.password) delete data.password
+    if (editId && !data.api_key) delete data.api_key
     saveMutation.mutate(data)
   }
 
@@ -127,7 +124,7 @@ function UnifiSection() {
                   {cred.label || cred.host}
                 </span>
                 <span className="text-xs text-gray-400 ml-2">
-                  {cred.username}@{cred.host}
+                  {cred.host}
                 </span>
                 {cred.last_test_success !== null && (
                   <span
@@ -219,33 +216,23 @@ function UnifiSection() {
                 required
               />
             </div>
-            <div>
+            <div className="col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Username
-              </label>
-              <input
-                type="text"
-                value={form.username}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, username: e.target.value }))
-                }
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password{editId ? ' (leave blank to keep)' : ''}
+                API Key{editId ? ' (leave blank to keep current)' : ''}
               </label>
               <input
                 type="password"
-                value={form.password}
+                value={form.api_key}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, password: e.target.value }))
+                  setForm((f) => ({ ...f, api_key: e.target.value }))
                 }
+                placeholder="UniFi controller API key"
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
                 required={!editId}
               />
+              <p className="text-xs text-gray-400 mt-1">
+                Generate in UniFi OS → Settings → API Keys
+              </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

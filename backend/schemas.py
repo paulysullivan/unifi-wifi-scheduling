@@ -21,12 +21,16 @@ class UserResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
 # Credentials
 class CredentialCreate(BaseModel):
     label: str | None = None
     host: str
-    username: str
-    password: str
+    api_key: str
     site_id: str = "default"
     verify_ssl: bool = False
 
@@ -34,8 +38,7 @@ class CredentialCreate(BaseModel):
 class CredentialUpdate(BaseModel):
     label: str | None = None
     host: str | None = None
-    username: str | None = None
-    password: str | None = None
+    api_key: str | None = None
     site_id: str | None = None
     verify_ssl: bool | None = None
 
@@ -44,7 +47,6 @@ class CredentialResponse(BaseModel):
     id: int
     label: str | None
     host: str
-    username: str
     site_id: str
     verify_ssl: bool
     is_active: bool
@@ -168,7 +170,7 @@ class ExtensionResponse(BaseModel):
     original_restrict_start: str
     extended_restrict_start: str
     created_at: datetime
-    created_by: int | None
+    created_by: int | None = None
 
     model_config = {"from_attributes": True}
 
@@ -184,9 +186,3 @@ class GroupStatusResponse(BaseModel):
     restrict_start_effective: str | None
     restrict_end: str | None
     device_count: int
-
-
-# Settings
-class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str

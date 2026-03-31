@@ -9,18 +9,14 @@ class UnifiClient:
     def __init__(
         self,
         host: str,
-        username: str,
-        password: str,
+        api_key: str,
         site_id: str = "default",
         verify_ssl: bool = False,
     ):
         self.host = host.rstrip("/")
-        self.username = username
-        self.password = password
+        self.api_key = api_key
         self.site_id = site_id
         self.verify_ssl = verify_ssl
-        self._cookies: dict[str, str] = {}
-        self._csrf_token: str | None = None
         self._client: httpx.AsyncClient | None = None
 
     async def _get_client(self) -> httpx.AsyncClient:
@@ -31,25 +27,8 @@ class UnifiClient:
             )
         return self._client
 
-    async def login(self) -> bool:
-        client = await self._get_client()
-        resp = await client.post(
-            f"{self.host}/api/auth/login",
-            json={"username": self.username, "password": self.password},
-        )
-        if resp.status_code != 200:
-            logger.error(f"UniFi login failed: {resp.status_code} {resp.text}")
-            return False
-
-        self._csrf_token = resp.headers.get("x-csrf-token")
-        self._cookies = dict(resp.cookies)
-        return True
-
     def _headers(self) -> dict[str, str]:
-        headers = {}
-        if self._csrf_token:
-            headers["x-csrf-token"] = self._csrf_token
-        return headers
+        return {"X-API-Key": self.api_key}
 
     async def _request(self, method: str, path: str, **kwargs) -> httpx.Response:
         client = await self._get_client()
@@ -61,13 +40,10 @@ class UnifiClient:
                     method,
                     url,
                     headers=self._headers(),
-                    cookies=self._cookies,
                     **kwargs,
                 )
-                if resp.status_code == 401 and attempt == 0:
-                    logger.info("Got 401, re-authenticating...")
-                    if await self.login():
-                        continue
+                if resp.status_code == 401:
+                    logger.error("UniFi API key authentication failed (401)")
                 return resp
             except httpx.HTTPError as e:
                 if attempt == 2:
@@ -80,17 +56,14 @@ class UnifiClient:
 
     async def test_connection(self) -> tuple[bool, str, str | None]:
         try:
-            if not await self.login():
-                return False, "Login failed — check username/password", None
-
             resp = await self._request(
                 "GET",
                 f"/proxy/network/api/s/{self.site_id}/stat/health",
             )
             if resp.status_code == 200:
-                data = resp.json()
-                site_name = self.site_id
-                return True, "Connection successful", site_name
+                return True, "Connection successful", self.site_id
+            elif resp.status_code == 401:
+                return False, "Authentication failed — check API key", None
             return False, f"API returned status {resp.status_code}", None
         except Exception as e:
             return False, f"Connection error: {str(e)}", None
@@ -112,9 +85,6 @@ class UnifiClient:
         return resp.json().get("data", [])
 
     async def sync_devices(self) -> list[dict]:
-        if not await self.login():
-            raise RuntimeError("Failed to authenticate with UniFi controller")
-
         active = await self.get_active_clients()
         all_clients = await self.get_all_clients()
 

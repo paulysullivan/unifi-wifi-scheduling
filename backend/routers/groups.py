@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from database import get_db
-from models import Group, Device, GroupDevice, Schedule, User
+from models import Group, Device, GroupDevice, Schedule
 from auth import get_current_user
 from schemas import (
     GroupCreate, GroupUpdate, GroupResponse, GroupDetailResponse,
@@ -29,7 +29,7 @@ def _schedule_summary(schedules: list[Schedule]) -> str | None:
 @router.get("", response_model=list[GroupResponse])
 async def list_groups(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     result = await db.execute(
         select(Group).options(selectinload(Group.devices), selectinload(Group.schedules))
@@ -53,7 +53,7 @@ async def list_groups(
 async def create_group(
     body: GroupCreate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     group = Group(name=body.name, description=body.description, color=body.color)
     db.add(group)
@@ -73,7 +73,7 @@ async def create_group(
 async def get_group(
     group_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     result = await db.execute(
         select(Group)
@@ -117,7 +117,7 @@ async def update_group(
     group_id: int,
     body: GroupUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     group = await db.get(Group, group_id)
     if not group:
@@ -136,7 +136,7 @@ async def update_group(
 async def delete_group(
     group_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     group = await db.get(Group, group_id)
     if not group:
@@ -151,7 +151,7 @@ async def set_group_devices(
     group_id: int,
     body: GroupDevicesUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     group = await db.get(Group, group_id)
     if not group:
@@ -179,7 +179,7 @@ async def remove_device_from_group(
     group_id: int,
     mac: str,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     result = await db.execute(
         select(GroupDevice).where(

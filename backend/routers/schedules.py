@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import get_db
-from models import Schedule, Group, User
+from models import Schedule, Group
 from auth import get_current_user
 from schemas import ScheduleCreate, ScheduleUpdate, ScheduleResponse
 
@@ -29,7 +29,7 @@ def _to_response(s: Schedule) -> ScheduleResponse:
 async def list_schedules(
     group_id: int | None = Query(None),
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     query = select(Schedule)
     if group_id is not None:
@@ -42,7 +42,7 @@ async def list_schedules(
 async def create_schedule(
     body: ScheduleCreate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     group = await db.get(Group, body.group_id)
     if not group:
@@ -72,7 +72,7 @@ async def update_schedule(
     schedule_id: int,
     body: ScheduleUpdate,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     schedule = await db.get(Schedule, schedule_id)
     if not schedule:
@@ -97,7 +97,7 @@ async def update_schedule(
 async def delete_schedule(
     schedule_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     schedule = await db.get(Schedule, schedule_id)
     if not schedule:
@@ -115,7 +115,7 @@ async def delete_schedule(
 async def toggle_schedule(
     schedule_id: int,
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     schedule = await db.get(Schedule, schedule_id)
     if not schedule:

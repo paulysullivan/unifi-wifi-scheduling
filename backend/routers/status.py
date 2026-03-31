@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from database import get_db
-from models import Group, Schedule, Extension, User
+from models import Group, Schedule, Extension
 from auth import get_current_user
 from schemas import GroupStatusResponse, ScheduleResponse
 
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/api/status", tags=["status"])
 @router.get("", response_model=list[GroupStatusResponse])
 async def get_status(
     db: AsyncSession = Depends(get_db),
-    _user: User = Depends(get_current_user),
+    _user=Depends(get_current_user),
 ):
     result = await db.execute(
         select(Group).options(selectinload(Group.devices), selectinload(Group.schedules))
