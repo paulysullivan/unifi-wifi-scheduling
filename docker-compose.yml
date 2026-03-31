@@ -8,8 +8,10 @@ services:
     environment:
       - DB_PATH=/app/data/network_schedule.db
       - STATIC_DIR=/app/static
+      - TZ=${TZ:-America/New_York}
     volumes:
       - ./data:/app/data
+      - /etc/localtime:/etc/localtime:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-7323}/api/health')"]
