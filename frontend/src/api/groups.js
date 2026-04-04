@@ -18,3 +18,12 @@ export const setGroupDevices = (id, macs) =>
 
 export const removeDeviceFromGroup = (groupId, mac) =>
   client.delete(`/groups/${groupId}/devices/${mac}`).then((r) => r.data)
+
+export const pauseGroup = (id) =>
+  client.post(`/groups/${id}/pause`).then((r) => r.data)
+
+export const unpauseGroup = (id) =>
+  client.post(`/groups/${id}/unpause`).then((r) => r.data)
+
+export const getGroupLogs = (id, limit = 20) =>
+  client.get(`/groups/${id}/logs`, { params: { limit } }).then((r) => r.data)

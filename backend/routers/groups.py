@@ -1,12 +1,14 @@
 import json
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select, func
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from database import get_db
-from models import Group, Device, GroupDevice, Schedule
+from models import Group, Device, GroupDevice, Schedule, EnforcementLog, UnifiCredential
 from auth import get_current_user
+from encryption import decrypt
+from unifi import UnifiClient
 from schemas import (
     GroupCreate, GroupUpdate, GroupResponse, GroupDetailResponse,
     GroupDevicesUpdate, DeviceResponse, ScheduleResponse,
@@ -41,6 +43,7 @@ async def list_groups(
             name=g.name,
             description=g.description,
             color=g.color,
+            is_paused=g.is_paused,
             created_at=g.created_at,
             device_count=len(g.devices),
             schedule_summary=_schedule_summary(g.schedules),
@@ -89,6 +92,7 @@ async def get_group(
         name=group.name,
         description=group.description,
         color=group.color,
+        is_paused=group.is_paused,
         created_at=group.created_at,
         device_count=len(group.devices),
         schedule_summary=_schedule_summary(group.schedules),
@@ -193,3 +197,130 @@ async def remove_device_from_group(
     await db.delete(gd)
     await db.commit()
     return {"message": "Removed"}
+
+
+async def _get_unifi_client(db: AsyncSession) -> UnifiClient:
+    result = await db.execute(
+        select(UnifiCredential).where(UnifiCredential.is_active == True)
+    )
+    cred = result.scalar_one_or_none()
+    if not cred:
+        raise HTTPException(status_code=400, detail="No active UniFi credentials configured")
+    return UnifiClient(
+        host=cred.host,
+        api_key=decrypt(cred.encrypted_api_key),
+        site_id=cred.site_id,
+        verify_ssl=cred.verify_ssl,
+    )
+
+
+@router.post("/{group_id}/pause")
+async def pause_group(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(get_current_user),
+):
+    group = await db.get(Group, group_id)
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    macs_result = await db.execute(
+        select(GroupDevice.device_mac).where(GroupDevice.group_id == group_id)
+    )
+    macs = [row[0] for row in macs_result.all()]
+    if not macs:
+        raise HTTPException(status_code=400, detail="No devices in group")
+
+    client = await _get_unifi_client(db)
+    try:
+        succeeded, failed = await client.block_devices(macs)
+        group.is_paused = True
+        log = EnforcementLog(
+            group_id=group_id,
+            action="block",
+            triggered_by="manual_pause",
+            device_macs=json.dumps(macs),
+            success=len(failed) == 0,
+            error_message=f"Failed: {failed}" if failed else None,
+        )
+        db.add(log)
+        await db.commit()
+        return {
+            "message": f"Paused — blocked {len(succeeded)}/{len(macs)} devices",
+            "blocked": succeeded,
+            "failed": failed,
+        }
+    finally:
+        await client.close()
+
+
+@router.post("/{group_id}/unpause")
+async def unpause_group(
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(get_current_user),
+):
+    group = await db.get(Group, group_id)
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    macs_result = await db.execute(
+        select(GroupDevice.device_mac).where(GroupDevice.group_id == group_id)
+    )
+    macs = [row[0] for row in macs_result.all()]
+    if not macs:
+        raise HTTPException(status_code=400, detail="No devices in group")
+
+    client = await _get_unifi_client(db)
+    try:
+        succeeded, failed = await client.unblock_devices(macs)
+        group.is_paused = False
+        log = EnforcementLog(
+            group_id=group_id,
+            action="unblock",
+            triggered_by="manual_unpause",
+            device_macs=json.dumps(macs),
+            success=len(failed) == 0,
+            error_message=f"Failed: {failed}" if failed else None,
+        )
+        db.add(log)
+        await db.commit()
+        return {
+            "message": f"Unpaused — unblocked {len(succeeded)}/{len(macs)} devices",
+            "unblocked": succeeded,
+            "failed": failed,
+        }
+    finally:
+        await client.close()
+
+
+@router.get("/{group_id}/logs")
+async def get_group_logs(
+    group_id: int,
+    limit: int = Query(default=20, le=100),
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(get_current_user),
+):
+    group = await db.get(Group, group_id)
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    result = await db.execute(
+        select(EnforcementLog)
+        .where(EnforcementLog.group_id == group_id)
+        .order_by(desc(EnforcementLog.executed_at))
+        .limit(limit)
+    )
+    logs = result.scalars().all()
+    return [
+        {
+            "id": log.id,
+            "action": log.action,
+            "triggered_by": log.triggered_by,
+            "device_macs": json.loads(log.device_macs),
+            "success": log.success,
+            "error_message": log.error_message,
+            "executed_at": log.executed_at.isoformat(),
+        }
+        for log in logs
+    ]

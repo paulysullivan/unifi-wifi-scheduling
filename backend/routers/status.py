@@ -100,6 +100,7 @@ async def get_status(
             name=group.name,
             color=group.color,
             is_restricted=is_restricted,
+            is_paused=group.is_paused,
             active_schedule=sched_resp,
             extension_minutes_today=extension_minutes,
             restrict_start_effective=effective_start,

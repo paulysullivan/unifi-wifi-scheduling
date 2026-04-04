@@ -140,6 +140,12 @@ async def unblock_group(schedule_id: int):
         if not schedule or not schedule.is_active:
             return
 
+        # Don't unblock a manually paused group
+        group = await db.get(Group, schedule.group_id)
+        if group and group.is_paused:
+            logger.info(f"Group {schedule.group_id} is manually paused — skipping scheduled unblock")
+            return
+
         macs = await _get_group_macs(schedule.group_id, db)
         if not macs:
             return

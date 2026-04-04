@@ -106,6 +106,7 @@ class GroupResponse(BaseModel):
     name: str
     description: str | None
     color: str | None
+    is_paused: bool = False
     created_at: datetime
     device_count: int = 0
     schedule_summary: str | None = None
@@ -181,6 +182,7 @@ class GroupStatusResponse(BaseModel):
     name: str
     color: str | None
     is_restricted: bool
+    is_paused: bool = False
     active_schedule: ScheduleResponse | None
     extension_minutes_today: int
     restrict_start_effective: str | None

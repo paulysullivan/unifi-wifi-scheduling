@@ -8,6 +8,9 @@ import {
   deleteGroup,
   setGroupDevices,
   removeDeviceFromGroup,
+  pauseGroup,
+  unpauseGroup,
+  getGroupLogs,
 } from '../api/groups'
 import { listDevices } from '../api/devices'
 import GroupCard from '../components/GroupCard'
@@ -101,8 +104,6 @@ export default function Groups() {
 function GroupDetail({ group, onBack, onDelete, queryClient }) {
   const [showAddDevices, setShowAddDevices] = useState(false)
 
-  if (!group) return <p className="text-gray-400 text-sm">Loading...</p>
-
   const removeMutation = useMutation({
     mutationFn: ({ groupId, mac }) => removeDeviceFromGroup(groupId, mac),
     onSuccess: () => {
@@ -110,6 +111,39 @@ function GroupDetail({ group, onBack, onDelete, queryClient }) {
       queryClient.invalidateQueries({ queryKey: ['devices'] })
     },
   })
+
+  const pauseMutation = useMutation({
+    mutationFn: () => pauseGroup(group?.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['group'] })
+      queryClient.invalidateQueries({ queryKey: ['groups'] })
+      queryClient.invalidateQueries({ queryKey: ['status'] })
+      queryClient.invalidateQueries({ queryKey: ['groupLogs'] })
+    },
+    onError: (err) => alert(err.response?.data?.detail || 'Pause failed'),
+  })
+
+  const unpauseMutation = useMutation({
+    mutationFn: () => unpauseGroup(group?.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['group'] })
+      queryClient.invalidateQueries({ queryKey: ['groups'] })
+      queryClient.invalidateQueries({ queryKey: ['status'] })
+      queryClient.invalidateQueries({ queryKey: ['groupLogs'] })
+    },
+    onError: (err) => alert(err.response?.data?.detail || 'Unpause failed'),
+  })
+
+  const { data: logs = [] } = useQuery({
+    queryKey: ['groupLogs', group?.id],
+    queryFn: () => getGroupLogs(group.id),
+    enabled: !!group?.id,
+  })
+
+  if (!group) return <p className="text-gray-400 text-sm">Loading...</p>
+
+  const isPaused = group.is_paused
+  const pausePending = pauseMutation.isPending || unpauseMutation.isPending
 
   return (
     <div>
@@ -128,13 +162,37 @@ function GroupDetail({ group, onBack, onDelete, queryClient }) {
               style={{ backgroundColor: group.color || '#4f46e5' }}
             />
             <h2 className="text-xl font-bold">{group.name}</h2>
+            {isPaused && (
+              <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
+                Paused
+              </span>
+            )}
           </div>
-          <button
-            onClick={onDelete}
-            className="text-sm text-red-600 hover:text-red-800 transition"
-          >
-            Delete
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() =>
+                isPaused ? unpauseMutation.mutate() : pauseMutation.mutate()
+              }
+              disabled={pausePending}
+              className={`px-3 py-1.5 text-sm rounded-lg transition disabled:opacity-50 ${
+                isPaused
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'bg-red-600 text-white hover:bg-red-700'
+              }`}
+            >
+              {pausePending
+                ? '...'
+                : isPaused
+                ? 'Unpause WiFi'
+                : 'Pause WiFi'}
+            </button>
+            <button
+              onClick={onDelete}
+              className="text-sm text-red-600 hover:text-red-800 transition"
+            >
+              Delete
+            </button>
+          </div>
         </div>
         {group.description && (
           <p className="text-sm text-gray-500">{group.description}</p>
@@ -183,7 +241,7 @@ function GroupDetail({ group, onBack, onDelete, queryClient }) {
       </div>
 
       {group.schedules?.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
           <h3 className="font-semibold mb-3">Schedules</h3>
           <div className="space-y-2">
             {group.schedules.map((s) => (
@@ -206,6 +264,56 @@ function GroupDetail({ group, onBack, onDelete, queryClient }) {
           </div>
         </div>
       )}
+
+      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-4">
+        <h3 className="font-semibold mb-2">UDM Pro Implementation</h3>
+        <p className="text-xs text-gray-500 mb-3">
+          Blocking is enforced via the UniFi stamgr API. Each device is individually blocked/unblocked
+          using <code className="bg-gray-100 px-1 rounded">cmd: block-sta</code> and{' '}
+          <code className="bg-gray-100 px-1 rounded">cmd: unblock-sta</code> commands
+          sent to <code className="bg-gray-100 px-1 rounded">/api/s/{'{site}'}/cmd/stamgr</code>.
+          Blocked devices are disconnected from the network and cannot reconnect until unblocked.
+        </p>
+        <h4 className="text-sm font-medium text-gray-700 mb-2">
+          Enforcement Log ({logs.length})
+        </h4>
+        {logs.length > 0 ? (
+          <div className="divide-y divide-gray-100 max-h-64 overflow-y-auto">
+            {logs.map((log) => (
+              <div key={log.id} className="py-2 text-sm">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`inline-block w-2 h-2 rounded-full ${
+                        log.action === 'block' ? 'bg-red-500' : 'bg-green-500'
+                      }`}
+                    />
+                    <span className="font-medium capitalize">{log.action}</span>
+                    <span className="text-xs text-gray-400">
+                      ({log.triggered_by.replace('_', ' ')})
+                    </span>
+                  </div>
+                  <span className="text-xs text-gray-400">
+                    {new Date(log.executed_at).toLocaleString()}
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {log.device_macs.length} device{log.device_macs.length !== 1 ? 's' : ''}{' '}
+                  {log.success ? (
+                    <span className="text-green-600">succeeded</span>
+                  ) : (
+                    <span className="text-red-600">
+                      failed{log.error_message ? `: ${log.error_message}` : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-gray-400 text-xs">No enforcement actions yet</p>
+        )}
+      </div>
 
       {showAddDevices && (
         <AddDevicesModal

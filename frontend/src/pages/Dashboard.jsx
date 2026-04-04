@@ -1,5 +1,6 @@
-import { useQueryClient } from '@tanstack/react-query'
+import { useQueryClient, useMutation } from '@tanstack/react-query'
 import { useStatus } from '../hooks/useStatus'
+import { pauseGroup, unpauseGroup } from '../api/groups'
 import StatusBadge from '../components/StatusBadge'
 import ExtendButton from '../components/ExtendButton'
 
@@ -58,7 +59,14 @@ export default function Dashboard() {
                     {status.device_count} device{status.device_count !== 1 ? 's' : ''}
                   </span>
                 </div>
-                <StatusBadge restricted={status.is_restricted} />
+                <div className="flex items-center gap-2">
+                  {status.is_paused && (
+                    <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
+                      Paused
+                    </span>
+                  )}
+                  <StatusBadge restricted={status.is_restricted || status.is_paused} />
+                </div>
               </div>
 
               {status.active_schedule && (
@@ -95,11 +103,44 @@ export default function Dashboard() {
                   </div>
                 </div>
               )}
+
+              <div className="mt-3 pt-3 border-t border-gray-100 flex justify-end">
+                <PauseButton
+                  groupId={status.group_id}
+                  isPaused={status.is_paused}
+                  queryClient={queryClient}
+                />
+              </div>
             </div>
           ))}
         </div>
       )}
     </div>
+  )
+}
+
+function PauseButton({ groupId, isPaused, queryClient }) {
+  const mutation = useMutation({
+    mutationFn: () => (isPaused ? unpauseGroup(groupId) : pauseGroup(groupId)),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['status'] })
+      queryClient.invalidateQueries({ queryKey: ['groups'] })
+    },
+    onError: (err) => alert(err.response?.data?.detail || 'Action failed'),
+  })
+
+  return (
+    <button
+      onClick={() => mutation.mutate()}
+      disabled={mutation.isPending}
+      className={`px-3 py-1.5 text-xs rounded-lg transition disabled:opacity-50 ${
+        isPaused
+          ? 'bg-green-600 text-white hover:bg-green-700'
+          : 'bg-red-600 text-white hover:bg-red-700'
+      }`}
+    >
+      {mutation.isPending ? '...' : isPaused ? 'Unpause WiFi' : 'Pause WiFi'}
+    </button>
   )
 }
 
