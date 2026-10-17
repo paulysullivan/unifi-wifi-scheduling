@@ -4,11 +4,14 @@ from datetime import datetime, date, timedelta
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.date import DateTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 from sqlalchemy import select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import async_session
-from models import Schedule, Extension, Group, GroupDevice, EnforcementLog, UnifiCredential
+from models import (
+    Schedule, Extension, Group, GroupDevice, EnforcementLog, UnifiCredential, Device,
+)
 from encryption import decrypt
 from unifi import UnifiClient
 
@@ -289,6 +292,116 @@ async def handle_extension_update(ext: "Extension", db: AsyncSession):
             )
 
 
+def _in_restricted_window(start: str, end: str, current_time: str) -> bool:
+    if start <= end:
+        return start <= current_time < end
+    return current_time >= start or current_time < end
+
+
+async def _group_restricted_now(db: AsyncSession, group: Group) -> bool:
+    if group.is_paused:
+        return True
+    now = datetime.now()
+    current_time = now.strftime("%H:%M")
+    result = await db.execute(
+        select(Schedule).where(
+            and_(Schedule.group_id == group.id, Schedule.is_active == True)
+        )
+    )
+    for schedule in result.scalars().all():
+        if now.weekday() not in json.loads(schedule.days_of_week):
+            continue
+        ext_result = await db.execute(
+            select(Extension).where(
+                and_(Extension.schedule_id == schedule.id, Extension.date == date.today())
+            )
+        )
+        ext = ext_result.scalar_one_or_none()
+        start = ext.extended_restrict_start if ext else schedule.restrict_start
+        if _in_restricted_window(start, schedule.restrict_end, current_time):
+            return True
+    return False
+
+
+# Hostnames too generic to identify a particular person's device.
+_GENERIC_HOSTNAMES = {"iphone", "ipad", "ipod", "macbook", "android", "localhost", "unknown"}
+
+
+async def follow_renamed_devices():
+    """Catch devices that reappear under a new MAC (e.g. Apple Private Wi-Fi Address).
+
+    A device that is in no group but shares a hostname with exactly one group's
+    members is added to that group, and blocked immediately if the group is
+    currently restricted.
+    """
+    client = await _get_unifi_client()
+    if not client:
+        return
+    try:
+        unifi_devices = await client.sync_devices()
+    except Exception:
+        logger.exception("Device follow: sync failed")
+        return
+    finally:
+        await client.close()
+
+    async with async_session() as db:
+        now = datetime.utcnow()
+        for ud in unifi_devices:
+            existing = (
+                await db.execute(select(Device).where(Device.mac == ud["mac"]))
+            ).scalar_one_or_none()
+            if existing:
+                existing.hostname = ud.get("hostname") or existing.hostname
+                existing.ip = ud.get("ip") or existing.ip
+                existing.last_seen = ud.get("last_seen") or existing.last_seen
+                existing.synced_at = now
+            else:
+                db.add(Device(
+                    mac=ud["mac"], name=ud.get("name"), hostname=ud.get("hostname"),
+                    ip=ud.get("ip"), device_type=ud.get("device_type"),
+                    last_seen=ud.get("last_seen"), synced_at=now,
+                ))
+        await db.commit()
+
+        rows = (await db.execute(
+            select(Device.hostname, GroupDevice.group_id, GroupDevice.device_mac)
+            .join(GroupDevice, GroupDevice.device_mac == Device.mac)
+        )).all()
+        grouped_macs = {r[2] for r in rows}
+        groups_by_host: dict[str, set[int]] = {}
+        for hostname, group_id, _ in rows:
+            host = (hostname or "").strip().lower()
+            if host and host not in _GENERIC_HOSTNAMES:
+                groups_by_host.setdefault(host, set()).add(group_id)
+
+        for ud in unifi_devices:
+            mac = ud["mac"]
+            host = (ud.get("hostname") or "").strip().lower()
+            group_ids = groups_by_host.get(host, set())
+            if mac in grouped_macs or len(group_ids) != 1:
+                continue
+            group_id = next(iter(group_ids))
+            db.add(GroupDevice(group_id=group_id, device_mac=mac))
+            await db.commit()
+            logger.warning(f"Device follow: {mac} ({host}) added to group {group_id}")
+
+            group = await db.get(Group, group_id)
+            if not await _group_restricted_now(db, group):
+                continue
+            client = await _get_unifi_client()
+            if not client:
+                continue
+            try:
+                succeeded, failed = await client.block_devices([mac])
+                await _log_enforcement(
+                    db, group_id, "block", "device_follow", [mac], not failed,
+                    f"Failed: {failed}" if failed else None,
+                )
+            finally:
+                await client.close()
+
+
 async def reconcile():
     logger.info("Running startup reconciliation...")
     async with async_session() as db:
@@ -321,11 +434,7 @@ async def reconcile():
             if ext:
                 start = ext.extended_restrict_start
 
-            # Determine expected state
-            if start <= end:
-                should_be_blocked = start <= current_time < end
-            else:
-                should_be_blocked = current_time >= start or current_time < end
+            should_be_blocked = _in_restricted_window(start, end, current_time)
 
             macs = await _get_group_macs(schedule.group_id, db)
             if not macs:
@@ -365,6 +474,12 @@ async def start_scheduler():
             await reschedule_for_schedule(schedule.id, db)
 
     await reconcile()
+    scheduler.add_job(
+        follow_renamed_devices,
+        trigger=IntervalTrigger(minutes=5),
+        id="follow_renamed_devices",
+        replace_existing=True,
+    )
     scheduler.start()
     logger.info("Scheduler started")
 

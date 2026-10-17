@@ -82,6 +82,14 @@ Log in with the `ADMIN_USERNAME` / `ADMIN_PASSWORD` from your `.env` file.
 4. **Activate** the credential set
 5. Go to **Devices** and click **Sync from Network**
 
+## Randomized MAC addresses (Apple Private Wi-Fi Address)
+
+Blocking is per MAC address, and iOS/macOS can present a different "private" MAC (per network, and rotating on newer versions, or after "Forget This Network"). To keep up, the app syncs UniFi every 5 minutes. A new device that is in no group and whose hostname matches members of exactly one group is added to that group automatically (and blocked at once if the group is currently restricted). Generic hostnames like "iPhone" are ignored. Matches are logged as `device_follow` in the enforcement log.
+
+For stronger protection, combine this with UniFi settings:
+- Put the device on a dedicated SSID with a MAC allow list, so an unknown MAC cannot join at all.
+- Or turn off Private Wi-Fi Address for that network on the device (Settings > Wi-Fi > network > Private Wi-Fi Address > Off), or enforce it with an MDM-managed Wi-Fi profile.
+
 ## Deployment Options
 
 ### Docker (recommended)
