@@ -4,6 +4,7 @@ import { useSearchParams } from 'react-router-dom'
 import {
   listGroups,
   createGroup,
+  updateGroup,
   getGroup,
   deleteGroup,
   setGroupDevices,
@@ -11,6 +12,7 @@ import {
   pauseGroup,
   unpauseGroup,
   getGroupLogs,
+  getWlans,
 } from '../api/groups'
 import { listDevices } from '../api/devices'
 import GroupCard from '../components/GroupCard'
@@ -22,6 +24,7 @@ export default function Groups() {
   const selectedId = searchParams.get('id')
   const [showCreate, setShowCreate] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
+  const [editTarget, setEditTarget] = useState(null)
 
   const { data: groups = [] } = useQuery({
     queryKey: ['groups'],
@@ -39,6 +42,15 @@ export default function Groups() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['groups'] })
       setShowCreate(false)
+    },
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }) => updateGroup(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['groups'] })
+      queryClient.invalidateQueries({ queryKey: ['group'] })
+      setEditTarget(null)
     },
   })
 
@@ -79,6 +91,7 @@ export default function Groups() {
           group={groupDetail}
           onBack={() => setSearchParams({})}
           onDelete={() => setDeleteTarget(groupDetail)}
+          onEdit={() => setEditTarget(groupDetail)}
           queryClient={queryClient}
         />
       )}
@@ -87,6 +100,14 @@ export default function Groups() {
         <CreateGroupModal
           onSave={(data) => createMutation.mutate(data)}
           onClose={() => setShowCreate(false)}
+        />
+      )}
+
+      {editTarget && (
+        <CreateGroupModal
+          group={editTarget}
+          onSave={(data) => updateMutation.mutate({ id: editTarget.id, data })}
+          onClose={() => setEditTarget(null)}
         />
       )}
 
@@ -101,7 +122,7 @@ export default function Groups() {
   )
 }
 
-function GroupDetail({ group, onBack, onDelete, queryClient }) {
+function GroupDetail({ group, onBack, onDelete, onEdit, queryClient }) {
   const [showAddDevices, setShowAddDevices] = useState(false)
 
   const removeMutation = useMutation({
@@ -162,6 +183,9 @@ function GroupDetail({ group, onBack, onDelete, queryClient }) {
               style={{ backgroundColor: group.color || '#4f46e5' }}
             />
             <h2 className="text-xl font-bold">{group.name}</h2>
+            {group.wlan_id && (
+              <span className="text-xs text-gray-500">WiFi network linked</span>
+            )}
             {isPaused && (
               <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-medium">
                 Paused
@@ -185,6 +209,12 @@ function GroupDetail({ group, onBack, onDelete, queryClient }) {
                 : isPaused
                 ? 'Unpause WiFi'
                 : 'Pause WiFi'}
+            </button>
+            <button
+              onClick={onEdit}
+              className="text-sm text-gray-600 hover:text-gray-900 transition"
+            >
+              Edit
             </button>
             <button
               onClick={onDelete}
@@ -417,14 +447,21 @@ function AddDevicesModal({ groupId, currentMacs, onClose, queryClient }) {
   )
 }
 
-function CreateGroupModal({ onSave, onClose }) {
-  const [name, setName] = useState('')
-  const [description, setDescription] = useState('')
-  const [color, setColor] = useState('#4f46e5')
+function CreateGroupModal({ group, onSave, onClose }) {
+  const [name, setName] = useState(group?.name || '')
+  const [description, setDescription] = useState(group?.description || '')
+  const [color, setColor] = useState(group?.color || '#4f46e5')
+  const [wlanId, setWlanId] = useState(group?.wlan_id || '')
+
+  const { data: wlans = [] } = useQuery({
+    queryKey: ['wlans'],
+    queryFn: getWlans,
+    retry: false,
+  })
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    onSave({ name, description: description || null, color })
+    onSave({ name, description: description || null, color, wlan_id: wlanId || null })
   }
 
   return (
@@ -462,6 +499,27 @@ function CreateGroupModal({ onSave, onClose }) {
               onChange={(e) => setColor(e.target.value)}
               className="h-10 w-20 rounded border border-gray-300 cursor-pointer"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              WiFi network
+            </label>
+            <select
+              value={wlanId}
+              onChange={(e) => setWlanId(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+            >
+              <option value="">None</option>
+              {wlans.map((w) => (
+                <option key={w.id} value={w.id}>
+                  {w.name}
+                </option>
+              ))}
+            </select>
+            <p className="text-xs text-amber-600 mt-1">
+              Blocking this group will turn off this entire WiFi network for every
+              device on it. Use a dedicated network for this group.
+            </p>
           </div>
           <div className="flex gap-3 justify-end pt-2">
             <button

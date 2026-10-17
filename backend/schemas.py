@@ -93,12 +93,14 @@ class GroupCreate(BaseModel):
     name: str
     description: str | None = None
     color: str | None = "#4f46e5"
+    wlan_id: str | None = None
 
 
 class GroupUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
     color: str | None = None
+    wlan_id: str | None = None
 
 
 class GroupResponse(BaseModel):
@@ -107,6 +109,7 @@ class GroupResponse(BaseModel):
     description: str | None
     color: str | None
     is_paused: bool = False
+    wlan_id: str | None = None
     created_at: datetime
     device_count: int = 0
     schedule_summary: str | None = None
@@ -117,6 +120,12 @@ class GroupResponse(BaseModel):
 class GroupDetailResponse(GroupResponse):
     devices: list[DeviceResponse] = []
     schedules: list["ScheduleResponse"] = []
+
+
+class WlanResponse(BaseModel):
+    id: str
+    name: str
+    enabled: bool
 
 
 class GroupDevicesUpdate(BaseModel):

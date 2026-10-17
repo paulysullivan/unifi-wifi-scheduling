@@ -1,6 +1,62 @@
+import { useMemo, useState } from 'react'
 import { formatDistanceToNow } from 'date-fns'
 
+const sortValue = {
+  name: (d) => d.name || d.hostname || d.mac,
+  mac: (d) => d.mac,
+  ip: (d) => d.ip,
+  groups: (d) => d.groups.join(', '),
+  last_seen: (d) => (d.last_seen ? new Date(d.last_seen).getTime() : null),
+}
+
+function compareValues(a, b) {
+  if (typeof a === 'number' && typeof b === 'number') return a - b
+  return String(a).localeCompare(String(b), undefined, { numeric: true, sensitivity: 'base' })
+}
+
 export default function DeviceTable({ devices, onEdit, compact = false }) {
+  const [sort, setSort] = useState({ key: null, dir: 'asc' })
+
+  const sorted = useMemo(() => {
+    if (!sort.key || !devices) return devices
+    const get = sortValue[sort.key]
+    const sign = sort.dir === 'asc' ? 1 : -1
+    return [...devices].sort((a, b) => {
+      const va = get(a)
+      const vb = get(b)
+      // Empty values always sort last, regardless of direction
+      if (va == null || va === '') return vb == null || vb === '' ? 0 : 1
+      if (vb == null || vb === '') return -1
+      return sign * compareValues(va, vb)
+    })
+  }, [devices, sort])
+
+  const toggleSort = (key) =>
+    setSort((prev) =>
+      prev.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }
+    )
+
+  const header = (key, label, className = '') => (
+    <th
+      className={`pb-2 font-medium ${className}`}
+      aria-sort={sort.key === key ? (sort.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+    >
+      {compact ? (
+        label
+      ) : (
+        <button
+          type="button"
+          onClick={() => toggleSort(key)}
+          className="inline-flex items-center gap-1 font-medium hover:text-gray-900"
+        >
+          {label}
+          <span className="text-xs text-gray-400">
+            {sort.key === key ? (sort.dir === 'asc' ? '▲' : '▼') : '↕'}
+          </span>
+        </button>
+      )}
+    </th>
+  )
   if (!devices?.length) {
     return <p className="text-gray-400 text-sm py-4">No devices found</p>
   }
@@ -10,17 +66,15 @@ export default function DeviceTable({ devices, onEdit, compact = false }) {
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-gray-200 text-left text-gray-500">
-            <th className="pb-2 font-medium">Name</th>
-            {!compact && <th className="pb-2 font-medium">MAC</th>}
-            {!compact && <th className="pb-2 font-medium hidden sm:table-cell">IP</th>}
-            <th className="pb-2 font-medium">Group(s)</th>
-            {!compact && (
-              <th className="pb-2 font-medium hidden md:table-cell">Last Seen</th>
-            )}
+            {header('name', 'Name')}
+            {!compact && header('mac', 'MAC')}
+            {!compact && header('ip', 'IP', 'hidden sm:table-cell')}
+            {header('groups', 'Group(s)')}
+            {!compact && header('last_seen', 'Last Seen', 'hidden md:table-cell')}
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {devices.map((device) => (
+          {sorted.map((device) => (
             <tr
               key={device.mac}
               onClick={() => onEdit?.(device)}
