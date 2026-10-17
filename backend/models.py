@@ -1,4 +1,5 @@
 from datetime import datetime, date
+from timeutil import utcnow
 from sqlalchemy import (
     Integer, Text, Boolean, DateTime, Date, ForeignKey, UniqueConstraint
 )
@@ -12,7 +13,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     username: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class UnifiCredential(Base):
@@ -54,7 +55,7 @@ class Group(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_paused: Mapped[bool] = mapped_column(Boolean, default=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
     devices: Mapped[list["Device"]] = relationship(
         secondary="group_devices", back_populates="groups"
@@ -83,9 +84,9 @@ class Schedule(Base):
     restrict_start: Mapped[str] = mapped_column(Text, nullable=False)  # HH:MM
     restrict_end: Mapped[str] = mapped_column(Text, nullable=False)  # HH:MM
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        DateTime, default=utcnow, onupdate=utcnow
     )
 
     group: Mapped["Group"] = relationship(back_populates="schedules")
@@ -103,7 +104,7 @@ class Extension(Base):
     added_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     original_restrict_start: Mapped[str] = mapped_column(Text, nullable=False)
     extended_restrict_start: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     created_by: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
 
 
@@ -117,4 +118,4 @@ class EnforcementLog(Base):
     device_macs: Mapped[str] = mapped_column(Text, nullable=False)  # JSON array
     success: Mapped[bool] = mapped_column(Boolean, nullable=False)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
-    executed_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    executed_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

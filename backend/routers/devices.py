@@ -1,4 +1,4 @@
-from datetime import datetime
+from timeutil import utcnow
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,7 +73,7 @@ async def sync_devices(
 
     new_count = 0
     updated_count = 0
-    now = datetime.utcnow()
+    now = utcnow()
 
     for ud in unifi_devices:
         result = await db.execute(select(Device).where(Device.mac == ud["mac"]))
