@@ -1,4 +1,4 @@
-from datetime import datetime
+from timeutil import utcnow
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -93,7 +93,7 @@ async def test_connection(
     )
     try:
         success, message, site_name = await client.test_connection()
-        cred.last_tested_at = datetime.utcnow()
+        cred.last_tested_at = utcnow()
         cred.last_test_success = success
         await db.commit()
         return TestConnectionResponse(success=success, message=message, site_name=site_name)
