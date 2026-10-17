@@ -54,6 +54,7 @@ class Group(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     color: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_paused: Mapped[bool] = mapped_column(Boolean, default=False)
+    wlan_id: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     devices: Mapped[list["Device"]] = relationship(

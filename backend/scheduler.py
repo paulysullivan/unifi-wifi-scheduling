@@ -64,6 +64,18 @@ async def _log_enforcement(
     await db.commit()
 
 
+async def _set_group_wlan(client: UnifiClient, group: Group | None, enabled: bool) -> list[str]:
+    """Enable/disable the group's linked WiFi network. Returns failures."""
+    if not group or not group.wlan_id:
+        return []
+    try:
+        ok = await client.set_wlan_enabled(group.wlan_id, enabled)
+    except Exception:
+        logger.exception(f"Error setting WLAN {group.wlan_id} enabled={enabled}")
+        ok = False
+    return [] if ok else [f"wlan:{group.wlan_id}"]
+
+
 async def block_group(schedule_id: int):
     async with async_session() as db:
         schedule = await db.get(Schedule, schedule_id)
@@ -108,8 +120,9 @@ async def block_group(schedule_id: int):
                 )
                 return
 
+        group = await db.get(Group, schedule.group_id)
         macs = await _get_group_macs(schedule.group_id, db)
-        if not macs:
+        if not macs and not (group and group.wlan_id):
             return
 
         client = await _get_unifi_client()
@@ -122,6 +135,7 @@ async def block_group(schedule_id: int):
 
         try:
             succeeded, failed = await client.block_devices(macs)
+            failed += await _set_group_wlan(client, group, False)
             success = len(failed) == 0
             error = f"Failed to block: {failed}" if failed else None
             await _log_enforcement(
@@ -150,7 +164,7 @@ async def unblock_group(schedule_id: int):
             return
 
         macs = await _get_group_macs(schedule.group_id, db)
-        if not macs:
+        if not macs and not (group and group.wlan_id):
             return
 
         client = await _get_unifi_client()
@@ -163,6 +177,7 @@ async def unblock_group(schedule_id: int):
 
         try:
             succeeded, failed = await client.unblock_devices(macs)
+            failed += await _set_group_wlan(client, group, True)
             success = len(failed) == 0
             error = f"Failed to unblock: {failed}" if failed else None
             await _log_enforcement(
@@ -261,12 +276,14 @@ async def handle_extension_update(ext: "Extension", db: AsyncSession):
         logger.info(f"Extension: rescheduled block for schedule {schedule.id} to {ext.extended_restrict_start}")
     elif now >= original_start:
         # Already past original block time — if currently blocked, unblock temporarily
+        group = await db.get(Group, schedule.group_id)
         macs = await _get_group_macs(schedule.group_id, db)
-        if macs:
+        if macs or (group and group.wlan_id):
             client = await _get_unifi_client()
             if client:
                 try:
                     await client.unblock_devices(macs)
+                    await _set_group_wlan(client, group, True)
                     await _log_enforcement(
                         db, schedule.group_id, "unblock", "extension", macs, True
                     )
@@ -436,8 +453,9 @@ async def reconcile():
 
             should_be_blocked = _in_restricted_window(start, end, current_time)
 
+            group = await db.get(Group, schedule.group_id)
             macs = await _get_group_macs(schedule.group_id, db)
-            if not macs:
+            if not macs and not (group and group.wlan_id):
                 continue
 
             client = await _get_unifi_client()
@@ -447,6 +465,7 @@ async def reconcile():
             try:
                 if should_be_blocked:
                     succeeded, failed = await client.block_devices(macs)
+                    failed += await _set_group_wlan(client, group, False)
                     await _log_enforcement(
                         db, schedule.group_id, "block", "startup_reconcile",
                         macs, len(failed) == 0,
@@ -455,6 +474,7 @@ async def reconcile():
                     logger.info(f"Reconcile: blocked {len(succeeded)} devices for group {schedule.group_id}")
                 else:
                     succeeded, failed = await client.unblock_devices(macs)
+                    failed += await _set_group_wlan(client, group, True)
                     await _log_enforcement(
                         db, schedule.group_id, "unblock", "startup_reconcile",
                         macs, len(failed) == 0,

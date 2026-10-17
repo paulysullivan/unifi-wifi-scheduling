@@ -124,6 +124,25 @@ class UnifiClient:
 
         return list(by_mac.values())
 
+    async def get_wlans(self) -> list[dict]:
+        resp = await self._request(
+            "GET",
+            f"/proxy/network/api/s/{self.site_id}/rest/wlanconf",
+        )
+        resp.raise_for_status()
+        return resp.json().get("data", [])
+
+    async def set_wlan_enabled(self, wlan_id: str, enabled: bool) -> bool:
+        resp = await self._request(
+            "PUT",
+            f"/proxy/network/api/s/{self.site_id}/rest/wlanconf/{wlan_id}",
+            json={"enabled": enabled},
+        )
+        if resp.status_code == 200:
+            return True
+        logger.error(f"Failed to set WLAN {wlan_id} enabled={enabled}: {resp.status_code} {resp.text}")
+        return False
+
     async def block_device(self, mac: str) -> bool:
         resp = await self._request(
             "POST",

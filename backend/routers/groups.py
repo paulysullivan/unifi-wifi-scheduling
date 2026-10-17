@@ -11,7 +11,7 @@ from encryption import decrypt
 from unifi import UnifiClient
 from schemas import (
     GroupCreate, GroupUpdate, GroupResponse, GroupDetailResponse,
-    GroupDevicesUpdate, DeviceResponse, ScheduleResponse,
+    GroupDevicesUpdate, DeviceResponse, ScheduleResponse, WlanResponse,
 )
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
@@ -44,6 +44,7 @@ async def list_groups(
             description=g.description,
             color=g.color,
             is_paused=g.is_paused,
+            wlan_id=g.wlan_id,
             created_at=g.created_at,
             device_count=len(g.devices),
             schedule_summary=_schedule_summary(g.schedules),
@@ -58,7 +59,9 @@ async def create_group(
     db: AsyncSession = Depends(get_db),
     _user=Depends(get_current_user),
 ):
-    group = Group(name=body.name, description=body.description, color=body.color)
+    group = Group(
+        name=body.name, description=body.description, color=body.color, wlan_id=body.wlan_id,
+    )
     db.add(group)
     await db.commit()
     await db.refresh(group)
@@ -67,9 +70,28 @@ async def create_group(
         name=group.name,
         description=group.description,
         color=group.color,
+        wlan_id=group.wlan_id,
         created_at=group.created_at,
         device_count=0,
     )
+
+
+@router.get("/wlans", response_model=list[WlanResponse])
+async def list_wlans(
+    db: AsyncSession = Depends(get_db),
+    _user=Depends(get_current_user),
+):
+    client = await _get_unifi_client(db)
+    try:
+        wlans = await client.get_wlans()
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Could not list WiFi networks: {e}")
+    finally:
+        await client.close()
+    return [
+        WlanResponse(id=w["_id"], name=w.get("name", w["_id"]), enabled=w.get("enabled", True))
+        for w in wlans
+    ]
 
 
 @router.get("/{group_id}", response_model=GroupDetailResponse)
@@ -93,6 +115,7 @@ async def get_group(
         description=group.description,
         color=group.color,
         is_paused=group.is_paused,
+        wlan_id=group.wlan_id,
         created_at=group.created_at,
         device_count=len(group.devices),
         schedule_summary=_schedule_summary(group.schedules),
@@ -132,7 +155,8 @@ async def update_group(
     await db.refresh(group)
     return GroupResponse(
         id=group.id, name=group.name, description=group.description,
-        color=group.color, created_at=group.created_at,
+        color=group.color, is_paused=group.is_paused, wlan_id=group.wlan_id,
+        created_at=group.created_at,
     )
 
 
@@ -228,12 +252,14 @@ async def pause_group(
         select(GroupDevice.device_mac).where(GroupDevice.group_id == group_id)
     )
     macs = [row[0] for row in macs_result.all()]
-    if not macs:
+    if not macs and not group.wlan_id:
         raise HTTPException(status_code=400, detail="No devices in group")
 
     client = await _get_unifi_client(db)
     try:
         succeeded, failed = await client.block_devices(macs)
+        if group.wlan_id and not await client.set_wlan_enabled(group.wlan_id, False):
+            failed.append(f"wlan:{group.wlan_id}")
         group.is_paused = True
         log = EnforcementLog(
             group_id=group_id,
@@ -268,12 +294,14 @@ async def unpause_group(
         select(GroupDevice.device_mac).where(GroupDevice.group_id == group_id)
     )
     macs = [row[0] for row in macs_result.all()]
-    if not macs:
+    if not macs and not group.wlan_id:
         raise HTTPException(status_code=400, detail="No devices in group")
 
     client = await _get_unifi_client(db)
     try:
         succeeded, failed = await client.unblock_devices(macs)
+        if group.wlan_id and not await client.set_wlan_enabled(group.wlan_id, True):
+            failed.append(f"wlan:{group.wlan_id}")
         group.is_paused = False
         log = EnforcementLog(
             group_id=group_id,

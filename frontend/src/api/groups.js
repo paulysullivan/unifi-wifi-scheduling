@@ -27,3 +27,5 @@ export const unpauseGroup = (id) =>
 
 export const getGroupLogs = (id, limit = 20) =>
   client.get(`/groups/${id}/logs`, { params: { limit } }).then((r) => r.data)
+
+export const getWlans = () => client.get('/groups/wlans').then((r) => r.data)
