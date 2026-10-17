@@ -1,6 +1,6 @@
 import logging
 import httpx
-from datetime import datetime
+from timeutil import utcfromtimestamp
 
 logger = logging.getLogger(__name__)
 
@@ -100,7 +100,7 @@ class UnifiClient:
                     "ip": client.get("ip") or client.get("last_ip"),
                     "device_type": client.get("dev_cat_name") or client.get("oui"),
                     "last_seen": (
-                        datetime.utcfromtimestamp(client["last_seen"])
+                        utcfromtimestamp(client["last_seen"])
                         if "last_seen" in client
                         else None
                     ),
@@ -116,7 +116,7 @@ class UnifiClient:
                     "ip": client.get("ip"),
                     "device_type": client.get("dev_cat_name") or client.get("oui"),
                     "last_seen": (
-                        datetime.utcfromtimestamp(client["last_seen"])
+                        utcfromtimestamp(client["last_seen"])
                         if "last_seen" in client
                         else None
                     ),
