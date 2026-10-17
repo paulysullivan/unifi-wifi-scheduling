@@ -88,6 +88,10 @@ Blocking is per MAC address, and iOS/macOS can present a different "private" MAC
 
 **Limitation:** this only works when the device reports a distinctive hostname. Many iPhones, iPads and Watches report a generic one ("iPhone", "iPad", "watch"), which is deliberately ignored because it would match everyone's devices. For those, use the network-side options below.
 
+### WiFi-network scheduling
+
+A group can be linked to a UniFi WiFi network (Groups > Edit > WiFi network). When the group is blocked, paused or restricted by schedule, the whole network is disabled, and it is re-enabled on unblock. This does not depend on MAC addresses, so randomized addresses cannot avoid it. **It turns the network off for every device on it**, so link only a dedicated network (for example a "Kids" SSID), and keep other devices off it.
+
 For stronger protection, combine this with UniFi settings:
 - Put the device on a dedicated SSID with a MAC allow list, so an unknown MAC cannot join at all.
 - Or turn off Private Wi-Fi Address for that network on the device (Settings > Wi-Fi > network > Private Wi-Fi Address > Off), or enforce it with an MDM-managed Wi-Fi profile.
