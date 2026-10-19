@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listDevices, syncDevices, updateDevice } from '../api/devices'
 import { listGroups, getGroup, setGroupDevices, removeDeviceFromGroup } from '../api/groups'
-import DeviceTable from '../components/DeviceTable'
+import DeviceTable, { isPrivateMac } from '../components/DeviceTable'
 
 const ACTIVITY_OPTIONS = [
   { value: '1', label: 'Last 24 hours' },
@@ -57,6 +57,7 @@ export default function Devices() {
       !q ||
       d.name?.toLowerCase().includes(q) ||
       d.mac.toLowerCase().includes(q) ||
+      d.vendor?.toLowerCase().includes(q) ||
       d.hostname?.toLowerCase().includes(q) ||
       d.ip?.includes(q)
     )
@@ -191,6 +192,12 @@ function DeviceEditPanel({ device, groups, onClose, onSave, onGroupChange }) {
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">MAC</label>
             <p className="text-sm text-gray-500 font-mono">{device.mac}</p>
+            {device.vendor && <p className="text-xs text-gray-500 mt-1">{device.vendor}</p>}
+            {isPrivateMac(device.mac) && (
+              <p className="text-xs text-purple-700 mt-1">
+                Likely a private (randomized) address. It may change, which can defeat MAC-based blocking.
+              </p>
+            )}
           </div>
 
           <div>

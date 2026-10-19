@@ -15,6 +15,7 @@ import {
   getWlans,
 } from '../api/groups'
 import { listDevices } from '../api/devices'
+import DeviceDetails from '../components/DeviceDetails'
 import GroupCard from '../components/GroupCard'
 import ConfirmDialog from '../components/ConfirmDialog'
 
@@ -253,6 +254,7 @@ function GroupDetail({ group, onBack, onDelete, onEdit, queryClient }) {
                     {d.name || d.hostname || d.mac}
                   </span>
                   <span className="text-xs text-gray-400 ml-2">{d.mac}</span>
+                  <DeviceDetails device={d} />
                 </div>
                 <button
                   onClick={() =>
@@ -423,6 +425,7 @@ function AddDevicesModal({ groupId, currentMacs, onClose, queryClient }) {
                   {d.name || d.hostname || d.mac}
                 </span>
                 <span className="text-xs text-gray-400 ml-2">{d.mac}</span>
+                <DeviceDetails device={d} />
               </div>
             </label>
           ))}

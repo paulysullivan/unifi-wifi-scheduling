@@ -8,10 +8,11 @@ from database import get_db
 from models import Group, Device, GroupDevice, Schedule, EnforcementLog, UnifiCredential
 from auth import get_current_user
 from encryption import decrypt
+from routers.devices import _device_to_response
 from unifi import UnifiClient
 from schemas import (
     GroupCreate, GroupUpdate, GroupResponse, GroupDetailResponse,
-    GroupDevicesUpdate, DeviceResponse, ScheduleResponse, WlanResponse,
+    GroupDevicesUpdate, ScheduleResponse, WlanResponse,
 )
 
 router = APIRouter(prefix="/api/groups", tags=["groups"])
@@ -119,14 +120,7 @@ async def get_group(
         created_at=group.created_at,
         device_count=len(group.devices),
         schedule_summary=_schedule_summary(group.schedules),
-        devices=[
-            DeviceResponse(
-                id=d.id, mac=d.mac, name=d.name, hostname=d.hostname,
-                ip=d.ip, device_type=d.device_type, last_seen=d.last_seen,
-                synced_at=d.synced_at, groups=[g.name for g in d.groups],
-            )
-            for d in group.devices
-        ],
+        devices=[_device_to_response(d) for d in group.devices],
         schedules=[
             ScheduleResponse(
                 id=s.id, group_id=s.group_id, label=s.label,

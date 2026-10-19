@@ -9,6 +9,7 @@ from models import Device, UnifiCredential, GroupDevice
 from auth import get_current_user
 from encryption import decrypt
 from schemas import DeviceResponse, DeviceUpdate, SyncResponse
+from oui import lookup_vendor
 from unifi import UnifiClient
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
@@ -28,6 +29,7 @@ def _device_to_response(device: Device) -> DeviceResponse:
         network=device.network,
         ssid=device.ssid,
         vlan=device.vlan,
+        vendor=lookup_vendor(device.mac),
         groups=[g.name for g in device.groups] if device.groups else [],
     )
 

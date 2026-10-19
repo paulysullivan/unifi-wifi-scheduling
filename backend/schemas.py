@@ -76,6 +76,7 @@ class DeviceResponse(BaseModel):
     network: str | None = None
     ssid: str | None = None
     vlan: int | None = None
+    vendor: str | None = None
     groups: list[str] = []
 
     model_config = {"from_attributes": True}
