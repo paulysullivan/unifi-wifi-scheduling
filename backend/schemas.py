@@ -72,6 +72,11 @@ class DeviceResponse(BaseModel):
     device_type: str | None
     last_seen: datetime | None
     synced_at: datetime | None
+    is_wired: bool | None = None
+    network: str | None = None
+    ssid: str | None = None
+    vlan: int | None = None
+    vendor: str | None = None
     groups: list[str] = []
 
     model_config = {"from_attributes": True}

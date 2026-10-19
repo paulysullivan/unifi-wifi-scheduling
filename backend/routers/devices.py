@@ -9,6 +9,7 @@ from models import Device, UnifiCredential, GroupDevice
 from auth import get_current_user
 from encryption import decrypt
 from schemas import DeviceResponse, DeviceUpdate, SyncResponse
+from oui import lookup_vendor
 from unifi import UnifiClient
 
 router = APIRouter(prefix="/api/devices", tags=["devices"])
@@ -24,6 +25,11 @@ def _device_to_response(device: Device) -> DeviceResponse:
         device_type=device.device_type,
         last_seen=device.last_seen,
         synced_at=device.synced_at,
+        is_wired=device.is_wired,
+        network=device.network,
+        ssid=device.ssid,
+        vlan=device.vlan,
+        vendor=lookup_vendor(device.mac),
         groups=[g.name for g in device.groups] if device.groups else [],
     )
 
@@ -85,6 +91,10 @@ async def sync_devices(
             existing.last_seen = ud.get("last_seen") or existing.last_seen
             if not existing.name:
                 existing.name = ud.get("name")
+            existing.is_wired = ud.get("is_wired")
+            existing.network = ud.get("network")
+            existing.ssid = ud.get("ssid")
+            existing.vlan = ud.get("vlan")
             existing.synced_at = now
             updated_count += 1
         else:
@@ -96,6 +106,10 @@ async def sync_devices(
                 device_type=ud.get("device_type"),
                 last_seen=ud.get("last_seen"),
                 synced_at=now,
+                is_wired=ud.get("is_wired"),
+                network=ud.get("network"),
+                ssid=ud.get("ssid"),
+                vlan=ud.get("vlan"),
             )
             db.add(device)
             new_count += 1

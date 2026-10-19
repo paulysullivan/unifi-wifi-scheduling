@@ -41,6 +41,10 @@ class Device(Base):
     device_type: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_seen: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    is_wired: Mapped[bool | None] = mapped_column(Boolean, nullable=True)
+    network: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ssid: Mapped[str | None] = mapped_column(Text, nullable=True)
+    vlan: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     groups: Mapped[list["Group"]] = relationship(
         secondary="group_devices", back_populates="devices"
