@@ -5,6 +5,18 @@ from timeutil import utcfromtimestamp
 logger = logging.getLogger(__name__)
 
 
+def _connection_info(client: dict) -> dict:
+    is_wired = client.get("is_wired")
+    wired = bool(is_wired) if is_wired is not None else not client.get("essid")
+    vlan = client.get("vlan")
+    return {
+        "is_wired": wired,
+        "network": client.get("network") or client.get("last_connection_network_name"),
+        "ssid": None if wired else client.get("essid"),
+        "vlan": int(vlan) if isinstance(vlan, (int, str)) and str(vlan).isdigit() else None,
+    }
+
+
 class UnifiClient:
     def __init__(
         self,
@@ -104,6 +116,7 @@ class UnifiClient:
                         if "last_seen" in client
                         else None
                     ),
+                    **_connection_info(client),
                 }
 
         for client in active:
@@ -120,6 +133,7 @@ class UnifiClient:
                         if "last_seen" in client
                         else None
                     ),
+                    **_connection_info(client),
                 }
 
         return list(by_mac.values())

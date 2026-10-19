@@ -5,6 +5,8 @@ const sortValue = {
   name: (d) => d.name || d.hostname || d.mac,
   mac: (d) => d.mac,
   ip: (d) => d.ip,
+  connection: (d) => (d.is_wired == null ? null : d.is_wired ? 'Wired' : 'WiFi'),
+  network: (d) => d.network,
   groups: (d) => d.groups.join(', '),
   last_seen: (d) => (d.last_seen ? new Date(d.last_seen).getTime() : null),
 }
@@ -69,6 +71,8 @@ export default function DeviceTable({ devices, onEdit, compact = false }) {
             {header('name', 'Name')}
             {!compact && header('mac', 'MAC')}
             {!compact && header('ip', 'IP', 'hidden sm:table-cell')}
+            {!compact && header('connection', 'Connection', 'hidden sm:table-cell')}
+            {!compact && header('network', 'Network / VLAN', 'hidden md:table-cell')}
             {header('groups', 'Group(s)')}
             {!compact && header('last_seen', 'Last Seen', 'hidden md:table-cell')}
           </tr>
@@ -100,6 +104,28 @@ export default function DeviceTable({ devices, onEdit, compact = false }) {
               {!compact && (
                 <td className="py-2.5 pr-3 text-gray-500 hidden sm:table-cell">
                   {device.ip || '—'}
+                </td>
+              )}
+              {!compact && (
+                <td className="py-2.5 pr-3 text-gray-600 hidden sm:table-cell">
+                  {device.is_wired == null ? '—' : device.is_wired ? 'Wired' : 'WiFi'}
+                </td>
+              )}
+              {!compact && (
+                <td className="py-2.5 pr-3 text-gray-600 hidden md:table-cell">
+                  {device.network || device.ssid || device.vlan != null ? (
+                    <>
+                      {device.network}
+                      {device.ssid && (
+                        <span className="block text-xs text-gray-400">SSID: {device.ssid}</span>
+                      )}
+                      {device.vlan != null && (
+                        <span className="block text-xs text-gray-400">VLAN {device.vlan}</span>
+                      )}
+                    </>
+                  ) : (
+                    '—'
+                  )}
                 </td>
               )}
               <td className="py-2.5 pr-3">

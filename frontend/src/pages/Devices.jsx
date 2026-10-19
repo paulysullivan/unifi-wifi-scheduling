@@ -4,9 +4,17 @@ import { listDevices, syncDevices, updateDevice } from '../api/devices'
 import { listGroups, getGroup, setGroupDevices, removeDeviceFromGroup } from '../api/groups'
 import DeviceTable from '../components/DeviceTable'
 
+const ACTIVITY_OPTIONS = [
+  { value: '1', label: 'Last 24 hours' },
+  { value: '7', label: 'Last 7 days' },
+  { value: '30', label: 'Last 30 days' },
+  { value: 'all', label: 'All history' },
+]
+
 export default function Devices() {
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
+  const [activity, setActivity] = useState('7')
   const [selectedDevice, setSelectedDevice] = useState(null)
 
   const { data: devices = [], isLoading } = useQuery({
@@ -38,7 +46,12 @@ export default function Devices() {
     },
   })
 
+  const cutoff = activity === 'all' ? null : Date.now() - Number(activity) * 86400000
+
   const filtered = devices.filter((d) => {
+    if (cutoff != null && !(d.last_seen && new Date(d.last_seen).getTime() >= cutoff)) {
+      return false
+    }
     const q = search.toLowerCase()
     return (
       !q ||
@@ -62,13 +75,39 @@ export default function Devices() {
         </button>
       </div>
 
-      <input
-        type="text"
-        placeholder="Search devices..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full mb-4 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-      />
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
+        <input
+          type="text"
+          placeholder="Search devices..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+        />
+        <select
+          value={activity}
+          onChange={(e) => setActivity(e.target.value)}
+          aria-label="Activity filter"
+          className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+        >
+          {ACTIVITY_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {activity !== 'all' && !isLoading && filtered.length < devices.length && (
+        <p className="text-xs text-gray-500 mb-3">
+          Showing recently active devices.{' '}
+          <button
+            type="button"
+            onClick={() => setActivity('all')}
+            className="text-indigo-600 hover:underline"
+          >
+            Show full history ({devices.length} devices)
+          </button>
+        </p>
+      )}
 
       {isLoading ? (
         <p className="text-gray-400 text-sm">Loading...</p>
